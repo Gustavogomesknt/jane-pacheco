@@ -78,3 +78,12 @@ public class Photo
     public string Caption { get; set; } = "";
     public int SortOrder { get; set; }
 }
+
+/// <summary>Bytes da foto, guardados no banco (hospedagem gratuita não tem disco persistente).</summary>
+public class PhotoContent
+{
+    public int PhotoId { get; set; }
+    public Photo? Photo { get; set; }
+    public string ContentType { get; set; } = "image/jpeg";
+    public byte[] Data { get; set; } = [];
+}

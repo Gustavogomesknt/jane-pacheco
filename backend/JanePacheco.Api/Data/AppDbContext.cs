@@ -10,6 +10,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<ClinicSettings> Settings => Set<ClinicSettings>();
     public DbSet<Photo> Photos => Set<Photo>();
+    public DbSet<PhotoContent> PhotoContents => Set<PhotoContent>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -38,5 +39,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         });
 
         b.Entity<ClinicSettings>().Property(x => x.Id).ValueGeneratedNever();
+
+        b.Entity<Photo>().HasIndex(x => x.FileName).IsUnique();
+        b.Entity<PhotoContent>(e =>
+        {
+            e.HasKey(x => x.PhotoId);
+            e.HasOne(x => x.Photo).WithOne().HasForeignKey<PhotoContent>(x => x.PhotoId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(x => x.ContentType).HasMaxLength(40);
+        });
     }
 }

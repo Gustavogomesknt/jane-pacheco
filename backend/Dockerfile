@@ -10,10 +10,8 @@ RUN dotnet publish JanePacheco.Api/JanePacheco.Api.csproj -c Release -o /app --n
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 COPY --from=build /app .
-ENV ASPNETCORE_ENVIRONMENT=Production \
-    ASPNETCORE_HTTP_PORTS=8080 \
-    ConnectionStrings__Default="Data Source=/data/janepacheco.db" \
-    Uploads__Path=/data/uploads
-RUN mkdir -p /data/uploads
+ENV ASPNETCORE_ENVIRONMENT=Production
+# A porta vem da variável PORT (o Render define sozinho); 8080 é o padrão local.
+ENV PORT=8080
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "JanePacheco.Api.dll"]

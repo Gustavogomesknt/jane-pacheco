@@ -1,8 +1,0 @@
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "rewrites": [
-    { "source": "/api/:path*", "destination": "https://SUA-API.onrender.com/api/:path*" },
-    { "source": "/uploads/:path*", "destination": "https://SUA-API.onrender.com/uploads/:path*" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}

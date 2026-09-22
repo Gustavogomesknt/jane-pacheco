@@ -11,7 +11,7 @@ namespace JanePacheco.Api.Endpoints;
 public static class AdminEndpoints
 {
     private static readonly string[] AllowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
-    private const long MaxImageBytes = 10 * 1024 * 1024;
+    private const long MaxImageBytes = 4 * 1024 * 1024; // o site já comprime antes de enviar
 
     public static void MapAdminEndpoints(this WebApplication app)
     {
@@ -138,30 +138,25 @@ public static class AdminEndpoints
             return Results.Ok(await ClinicMapper.LoadAsync(db, ct));
         });
 
-        // ---------- Fotos ----------
+        // ---------- Fotos (guardadas no banco) ----------
         g.MapPost("/photos", async ([FromForm] string slot, [FromForm] string? caption, IFormFile file,
-            AppDbContext db, UploadStorage storage, CancellationToken ct) =>
+            AppDbContext db, CancellationToken ct) =>
         {
             if (slot is not ("hero" or "about" or "gallery")) return Results.BadRequest(new ApiError("Local da foto inválido."));
             if (!AllowedImageTypes.Contains(file.ContentType)) return Results.BadRequest(new ApiError("Use uma foto em JPG, PNG ou WebP."));
-            if (file.Length > MaxImageBytes) return Results.BadRequest(new ApiError("A foto precisa ter até 10 MB."));
+            if (file.Length > MaxImageBytes) return Results.BadRequest(new ApiError("A foto precisa ter até 4 MB."));
+
+            using var ms = new MemoryStream();
+            await file.CopyToAsync(ms, ct);
+
+            // Capa e foto do "Sobre" são únicas: substitui a anterior (o conteúdo sai junto, em cascata).
+            if (slot is "hero" or "about")
+                await db.Photos.Where(p => p.Slot == slot).ExecuteDeleteAsync(ct);
 
             var ext = file.ContentType switch { "image/png" => ".png", "image/webp" => ".webp", _ => ".jpg" };
-            var fileName = $"{Guid.NewGuid():N}{ext}";
-            await using (var fs = File.Create(Path.Combine(storage.Root, fileName)))
-                await file.CopyToAsync(fs, ct);
-
-            // Capa e foto do "Sobre" são únicas: substitui a anterior.
-            if (slot is "hero" or "about")
-            {
-                var old = await db.Photos.Where(p => p.Slot == slot).ToListAsync(ct);
-                foreach (var o in old) DeleteFile(storage, o.FileName);
-                db.Photos.RemoveRange(old);
-            }
-
             var order = await db.Photos.Where(p => p.Slot == slot).Select(p => (int?)p.SortOrder).MaxAsync(ct) ?? -1;
-            var photo = new Photo { Slot = slot, FileName = fileName, Caption = caption?.Trim() ?? "", SortOrder = order + 1 };
-            db.Photos.Add(photo);
+            var photo = new Photo { Slot = slot, FileName = $"{Guid.NewGuid():N}{ext}", Caption = caption?.Trim() ?? "", SortOrder = order + 1 };
+            db.PhotoContents.Add(new PhotoContent { Photo = photo, ContentType = file.ContentType, Data = ms.ToArray() });
             await db.SaveChangesAsync(ct);
             return Results.Created(PhotoDto.From(photo).Url, PhotoDto.From(photo));
         }).DisableAntiforgery(); // API protegida por JWT, sem cookies.
@@ -175,14 +170,10 @@ public static class AdminEndpoints
             return Results.Ok(PhotoDto.From(p));
         });
 
-        g.MapDelete("/photos/{id:int}", async (int id, AppDbContext db, UploadStorage storage, CancellationToken ct) =>
+        g.MapDelete("/photos/{id:int}", async (int id, AppDbContext db, CancellationToken ct) =>
         {
-            var p = await db.Photos.FindAsync([id], ct);
-            if (p is null) return Results.NotFound();
-            DeleteFile(storage, p.FileName);
-            db.Photos.Remove(p);
-            await db.SaveChangesAsync(ct);
-            return Results.NoContent();
+            var n = await db.Photos.Where(p => p.Id == id).ExecuteDeleteAsync(ct);
+            return n == 0 ? Results.NotFound() : Results.NoContent();
         });
     }
 
@@ -223,11 +214,5 @@ public static class AdminEndpoints
         s.Name = req.Name.Trim(); s.Description = (req.Description ?? "").Trim(); s.Category = req.Category;
         s.DurationMin = req.DurationMin; s.Price = req.Price; s.SortOrder = req.SortOrder; s.Active = req.Active;
         return null;
-    }
-
-    private static void DeleteFile(UploadStorage storage, string fileName)
-    {
-        var path = Path.Combine(storage.Root, Path.GetFileName(fileName));
-        if (File.Exists(path)) File.Delete(path);
     }
 }

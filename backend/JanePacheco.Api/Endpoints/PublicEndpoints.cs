@@ -56,30 +56,57 @@ public static class PublicEndpoints
             var svc = await db.Services.AsNoTracking().FirstOrDefaultAsync(s => s.Id == req.ServiceId && s.Active, ct);
             if (svc is null) return Results.BadRequest(new ApiError("Tratamento não encontrado."));
 
-            // Transação serializável: evita que duas clientes peguem o mesmo horário ao mesmo tempo.
-            await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-
-            var slot = (await av.FreeSlotsAsync(req.Date, svc.DurationMin, req.ProfessionalId, ct))
-                .FirstOrDefault(s => s.Time == TimeHelpers.ToHm(start));
-            if (slot is null)
-                return Results.Conflict(new ApiError("Esse horário acabou de ser reservado. Escolha outro."));
-
-            var appt = new Appointment
+            try
             {
-                Date = req.Date, StartMin = start, DurationMin = svc.DurationMin,
-                ServiceId = svc.Id, ServiceName = svc.Name, Category = svc.Category, Price = svc.Price,
-                ProfessionalId = slot.ProfessionalId,
-                ClientName = name, ClientPhone = phone,
-                Origin = "site"
-            };
-            db.Appointments.Add(appt);
-            await db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
+                // Transação serializável: evita que duas clientes peguem o mesmo horário ao mesmo tempo.
+                await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
 
-            var proName = await db.Professionals.Where(p => p.Id == slot.ProfessionalId).Select(p => p.Name).FirstAsync(ct);
+                var slot = (await av.FreeSlotsAsync(req.Date, svc.DurationMin, req.ProfessionalId, ct))
+                    .FirstOrDefault(s => s.Time == TimeHelpers.ToHm(start));
+                if (slot is null)
+                    return Results.Conflict(new ApiError("Esse horário acabou de ser reservado. Escolha outro."));
 
-            return Results.Created($"/api/public/bookings/{appt.Id}",
-                new BookingResponse(appt.Id, appt.Date, TimeHelpers.ToHm(appt.StartMin), appt.ServiceName, proName));
+                var appt = new Appointment
+                {
+                    Date = req.Date, StartMin = start, DurationMin = svc.DurationMin,
+                    ServiceId = svc.Id, ServiceName = svc.Name, Category = svc.Category, Price = svc.Price,
+                    ProfessionalId = slot.ProfessionalId,
+                    ClientName = name, ClientPhone = phone,
+                    Origin = "site"
+                };
+                db.Appointments.Add(appt);
+                await db.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
+
+                var proName = await db.Professionals.Where(p => p.Id == slot.ProfessionalId).Select(p => p.Name).FirstAsync(ct);
+                return Results.Created($"/api/public/bookings/{appt.Id}",
+                    new BookingResponse(appt.Id, appt.Date, TimeHelpers.ToHm(appt.StartMin), appt.ServiceName, proName));
+            }
+            catch (Exception ex) when (IsConcurrencyConflict(ex))
+            {
+                return Results.Conflict(new ApiError("Esse horário acabou de ser reservado. Escolha outro."));
+            }
         });
+
+        // Fotos do site, servidas a partir do banco. O nome é único, então o navegador pode guardar em cache para sempre.
+        app.MapGet("/uploads/{name}", async (string name, AppDbContext db, HttpContext http, CancellationToken ct) =>
+        {
+            var c = await db.PhotoContents.AsNoTracking()
+                .Where(x => x.Photo!.FileName == name)
+                .Select(x => new { x.ContentType, x.Data })
+                .FirstOrDefaultAsync(ct);
+            if (c is null) return Results.NotFound();
+            http.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+            return Results.File(c.Data, c.ContentType);
+        }).ExcludeFromDescription();
+    }
+
+    /// <summary>Duas reservas simultâneas no mesmo horário: Postgres (40001) ou SQLite ocupado (5).</summary>
+    private static bool IsConcurrencyConflict(Exception ex)
+    {
+        for (var e = ex; e is not null; e = e.InnerException)
+            if (e is Npgsql.PostgresException { SqlState: "40001" } || e is Microsoft.Data.Sqlite.SqliteException { SqliteErrorCode: 5 })
+                return true;
+        return false;
     }
 }

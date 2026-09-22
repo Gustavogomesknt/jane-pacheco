@@ -17,3 +17,5 @@ dist/
 .vs/
 *.user
 .DS_Store
+.env.local
+.env.*.local

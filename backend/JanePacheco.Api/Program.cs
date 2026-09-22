@@ -6,19 +6,21 @@ using JanePacheco.Api.Endpoints;
 using JanePacheco.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Pasta das fotos enviadas. Em produção, aponte Uploads:Path para um disco persistente.
-var uploadsPath = builder.Configuration["Uploads:Path"] ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "uploads");
-Directory.CreateDirectory(uploadsPath);
-builder.Services.AddSingleton(new UploadStorage(uploadsPath));
+// Hospedagens como o Render informam a porta pela variável PORT.
+var port = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrEmpty(port)) builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
+var connectionString = builder.Configuration.GetConnectionString("Default") ?? "Data Source=janepacheco.db";
 builder.Services.AddDbContext<AppDbContext>(o =>
-    o.UseSqlite(builder.Configuration.GetConnectionString("Default")));
+{
+    if (DbConfig.IsPostgres(connectionString)) o.UseNpgsql(DbConfig.ToNpgsql(connectionString));
+    else o.UseSqlite(connectionString);
+});
 
 builder.Services.AddScoped<AvailabilityService>();
 builder.Services.AddSingleton<TokenService>();
@@ -70,7 +72,8 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    // Para o MVP em SQLite. Ao migrar para SQL Server/Postgres, troque por migrations (db.Database.Migrate()).
+    // Cria as tabelas na primeira execução (SQLite local ou Postgres do Neon).
+    // Quando o esquema começar a mudar com dados reais, troque por migrations (db.Database.Migrate()).
     db.Database.EnsureCreated();
     await Seed.RunAsync(db);
 }
@@ -82,7 +85,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
-app.UseStaticFiles(new StaticFileOptions { FileProvider = new PhysicalFileProvider(uploadsPath), RequestPath = "/uploads" });
 app.UseAuthentication();
 app.UseAuthorization();
 

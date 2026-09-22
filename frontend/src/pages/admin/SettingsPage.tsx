@@ -3,6 +3,7 @@ import { api, ApiError, type Category, type Clinic, type Photo, type PhotoSlot, 
 import { CATS, WD_FULL, toHM } from '../../lib/format'
 import { Frame } from '../../components/Frame'
 import { useToast } from '../../components/Toast'
+import { compressImage } from '../../lib/image'
 
 const errMsg = (e: unknown) => (e instanceof ApiError ? e.message : 'Não foi possível salvar.')
 
@@ -38,7 +39,7 @@ export default function SettingsPage() {
     e.target.value = ''
     if (!file) return
     setUploading(slot)
-    try { await api.uploadPhoto(file, slot); setClinic(await api.settings()); toast('Foto enviada.') }
+    try { await api.uploadPhoto(await compressImage(file), slot); setClinic(await api.settings()); toast('Foto enviada.') }
     catch (err) { toast(errMsg(err)) }
     finally { setUploading(null) }
   }
@@ -146,7 +147,7 @@ export default function SettingsPage() {
             </div>
           ))}
           <label className={`upload-tile ${uploading === 'gallery' ? 'uploading' : ''}`}>
-            <span>{uploading === 'gallery' ? 'Enviando…' : 'Adicionar foto à galeria'}<br /><small>JPG, PNG ou WebP, até 10 MB</small></span>
+            <span>{uploading === 'gallery' ? 'Enviando…' : 'Adicionar foto à galeria'}<br /><small>JPG, PNG ou WebP</small></span>
             <input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => upload(e, 'gallery')} />
           </label>
         </div>

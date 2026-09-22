@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import type { Photo } from '../api'
+import { assetUrl, type Photo } from '../api'
 
 const PAL = [['#EFD3D8', '#F8ECE8'], ['#DDE5D7', '#F3EFE7'], ['#EADBC6', '#F8F0E6'], ['#E6CFD9', '#F5E8EE'], ['#E3DAD0', '#F6F1EC'], ['#D9E0DA', '#F1EEEA']]
 
@@ -30,7 +30,7 @@ interface FrameProps { photo?: Photo | null; index?: number; arch?: boolean; cap
 export function Frame({ photo, index = 0, arch, caption, className = '', alt }: FrameProps) {
   return (
     <div className={`frame ${arch ? 'arch' : ''} ${className}`}>
-      {photo ? <img src={photo.url} alt={alt ?? photo.caption ?? ''} loading="lazy" /> : <Art index={index} />}
+      {photo ? <img src={assetUrl(photo.url)} alt={alt ?? photo.caption ?? ''} loading="lazy" /> : <Art index={index} />}
       {caption && <div className={`cap ${photo ? '' : 'soft'}`}>{caption}</div>}
     </div>
   )

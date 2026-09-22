@@ -37,6 +37,12 @@ export interface BookingResult { id: string; date: string; time: string; service
 export type SettingsInput = Pick<Clinic, 'name' | 'tagline' | 'about' | 'address' | 'whatsApp' | 'instagram' | 'open' | 'close' | 'slotMin' | 'closedDays'>
 export type ServiceInput = Omit<Service, 'id'>
 
+// Em dev fica vazio (o Vite repassa /api para a API local). Em produção, a URL da API no Render.
+const BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
+
+/** Fotos vêm como "/uploads/abc.jpg"; no site publicado precisam apontar para o domínio da API. */
+export const assetUrl = (url: string) => (/^https?:/.test(url) ? url : BASE + url)
+
 const TOKEN_KEY = 'jp_token'
 export const auth = {
   get: () => localStorage.getItem(TOKEN_KEY),
@@ -54,7 +60,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (token) headers.set('Authorization', `Bearer ${token}`)
   if (init.body && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json')
 
-  const res = await fetch(path, { ...init, headers })
+  const res = await fetch(BASE + path, { ...init, headers })
   if (res.status === 401 && path.startsWith('/api/admin')) {
     auth.clear()
     window.location.assign('/equipe/login')
