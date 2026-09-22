@@ -1,0 +1,22 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "API (.NET) com debug",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "api: build",
+      "program": "${workspaceFolder}/backend/JanePacheco.Api/bin/Debug/net8.0/JanePacheco.Api.dll",
+      "cwd": "${workspaceFolder}/backend/JanePacheco.Api",
+      "env": { "ASPNETCORE_ENVIRONMENT": "Development", "ASPNETCORE_URLS": "http://localhost:5080" },
+      "serverReadyAction": { "action": "openExternally", "pattern": "Now listening on: (http://\\S+)", "uriFormat": "%s/swagger" }
+    },
+    {
+      "name": "Site (Chrome)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend/src"
+    }
+  ]
+}

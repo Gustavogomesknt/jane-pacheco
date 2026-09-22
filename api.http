@@ -1,0 +1,31 @@
+### Teste rápido da API (extensão REST Client do VS Code)
+@api = http://localhost:5080
+
+GET {{api}}/api/public/clinic
+
+###
+GET {{api}}/api/public/services
+
+###
+GET {{api}}/api/public/days?serviceId=1
+
+###
+GET {{api}}/api/public/availability?serviceId=1&date=2026-09-24
+
+###
+POST {{api}}/api/public/bookings
+Content-Type: application/json
+
+{ "serviceId": 1, "date": "2026-09-24", "time": "10:00", "name": "Maria Souza", "phone": "(11) 98765-4321" }
+
+###
+# @name login
+POST {{api}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "jane@janepacheco.com.br", "password": "troque-esta-senha" }
+
+###
+@token = {{login.response.body.token}}
+GET {{api}}/api/admin/appointments?from=2026-09-21&to=2026-09-28
+Authorization: Bearer {{token}}

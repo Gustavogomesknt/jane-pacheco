@@ -1,0 +1,19 @@
+# .NET
+bin/
+obj/
+*.db
+*.db-shm
+*.db-wal
+backend/JanePacheco.Api/wwwroot/uploads/*
+!backend/JanePacheco.Api/wwwroot/uploads/.gitkeep
+appsettings.*.local.json
+
+# Node
+node_modules/
+dist/
+*.log
+
+# Editor
+.vs/
+*.user
+.DS_Store

@@ -1,0 +1,22 @@
+# Blueprint do Render para a API (.NET em Docker, com disco persistente para banco e fotos).
+services:
+  - type: web
+    name: janepacheco-api
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: starter            # disco persistente exige plano pago
+    healthCheckPath: /health
+    disk:
+      name: dados
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: Jwt__Key
+        generateValue: true
+      - key: Jwt__Issuer
+        value: janepacheco-api
+      - key: Admin__Email
+        sync: false
+      - key: Admin__Password
+        sync: false
